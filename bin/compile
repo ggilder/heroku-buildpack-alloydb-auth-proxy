@@ -5,40 +5,41 @@ set -e
 BUILD_DIR=$1
 CACHE_DIR=$2
 ENV_DIR=$3
-CACHED_BINARY=$CACHE_DIR/cloud_sql_proxy
+CACHED_BINARY=$CACHE_DIR/alloydb-auth-proxy
+GOOGLE_BIN_DIR=$BUILD_DIR/google/bin
 
 if [ ! -f $CACHED_BINARY ]; then
-	echo "-----> Downloading cloud_sql_proxy"
+	echo "-----> Downloading alloydb-auth-proxy"
 	mkdir -p $CACHE_DIR
-	wget https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64 -O $CACHED_BINARY
+	wget https://storage.googleapis.com/alloydb-auth-proxy/v1.12.2/alloydb-auth-proxy.linux.amd64 -O $CACHED_BINARY
 else
-  echo "-----> Found cloud_sql_proxy in the build cache"
+  echo "-----> Found alloydb-auth-proxy in the build cache"
 fi
 
 chmod +x $CACHED_BINARY
 VERSION=`$CACHED_BINARY --version`
 echo "       Using version: $VERSION"
 
-echo "-----> Vendoring cloud_sql_proxy into slug"
-if [ ! -d $BUILD_DIR/google/bin ]; then
-	mkdir -p $BUILD_DIR/google/bin
+echo "-----> Vendoring alloydb-auth-proxy into slug"
+if [ ! -d $GOOGLE_BIN_DIR ]; then
+	mkdir -p $GOOGLE_BIN_DIR
 fi
-cp $CACHE_DIR/cloud_sql_proxy $BUILD_DIR/google/bin
-chmod +x $BUILD_DIR/google/bin/cloud_sql_proxy
-PATH="$BUILD_DIR/google/bin:$PATH"
+cp $CACHED_BINARY $GOOGLE_BIN_DIR
+chmod +x $GOOGLE_BIN_DIR/alloydb-auth-proxy
+PATH="$GOOGLE_BIN_DIR:$PATH"
 
-if [ ! -d $BUILD_DIR/bin ]; then
-	mkdir $BUILD_DIR/bin
+BIN_DIR=$BUILD_DIR/bin
+BIN_PATH=$BIN_DIR/run_alloydb_auth_proxy
+
+if [ ! -d $BIN_DIR ]; then
+	mkdir $BIN_DIR
 fi
 
-# echo "-----> Create socket dir"
-# mkdir -p /cloudsql
-
-cat >$BUILD_DIR/bin/run_cloud_sql_proxy <<EOF
+cat >$BIN_PATH <<EOF
 #!/bin/sh
-printf "%s" "\$GSP_CREDENTIALS" > /app/google/credentials.json
-exec /app/google/bin/cloud_sql_proxy -credential_file=/app/google/credentials.json -instances=\$GSP_INSTANCES -dir=/tmp &
+printf "%s" "\$GOOGLE_CREDENTIALS_JSON" > /app/google/credentials.json
+exec /app/google/bin/alloydb-auth-proxy \$ALLOYDB_INSTANCES --credentials-file /app/google/credentials.json &
 EOF
-chmod +x $BUILD_DIR/bin/run_cloud_sql_proxy
+chmod +x $BIN_PATH
 
 exit 0
